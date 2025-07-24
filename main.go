@@ -1,7 +1,18 @@
 package main
 
-import "fmt"
+import (
+	"log"
+	"net/http"
+)
 
 func main() {
-    fmt.Println("Hello.")
+	mux := http.NewServeMux()
+
+	server := &http.Server{
+		Addr:    ":8000",
+		Handler: mux,
+	}
+
+	server.ListenAndServe()
+	log.Printf("Server started on %s", server.Addr)
 }
