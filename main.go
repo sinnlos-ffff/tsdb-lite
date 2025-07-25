@@ -8,15 +8,16 @@ import (
 )
 
 // TODO: Proper validation
-type MetricData struct {
+type PostPointRequest struct {
 	Metric    string            `json:"metric"`
 	Timestamp int64             `json:"timestamp"`
 	Value     float64           `json:"value"`
 	Tags      map[string]string `json:"tags"`
 }
 
-func metricHandler(w http.ResponseWriter, r *http.Request) {
-	var data MetricData
+// TODO: Accept multiple points in a single request
+func postPointHandler(w http.ResponseWriter, r *http.Request) {
+	var data PostPointRequest
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		http.Error(w, "Invalid payload: "+err.Error(), http.StatusBadRequest)
 		return
@@ -36,7 +37,7 @@ func metricHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("PUT /", metricHandler)
+	mux.HandleFunc("POST /point", postPointHandler)
 
 	server := &http.Server{
 		Addr:    ":8000",
