@@ -1,8 +1,9 @@
 package database
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAddTimeSeries(t *testing.T) {
@@ -11,17 +12,10 @@ func TestAddTimeSeries(t *testing.T) {
 	tags := map[string]string{"tag1": "value1"}
 	db.AddTimeSeries(metric, tags)
 
-	key := generateKey(metric, tags)
-	ts, ok := db.series[key]
-	if !ok {
-		t.Fatalf("TimeSeries not found for key: %s", key)
-	}
+	key := GenerateKey(metric, tags)
+	ts, ok := db.Series[key]
 
-	if ts.Metric != metric {
-		t.Errorf("Expected metric %s, got %s", metric, ts.Metric)
-	}
-
-	if !reflect.DeepEqual(ts.Tags, tags) {
-		t.Errorf("Expected tags %v, got %v", tags, ts.Tags)
-	}
+	assert.True(t, ok, "TimeSeries not found for key: %s", key)
+	assert.Equal(t, metric, ts.Metric)
+	assert.Equal(t, tags, ts.Tags)
 }

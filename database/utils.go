@@ -6,7 +6,7 @@ import (
 )
 
 // TODO: Add test
-func generateKey(metric string, tags map[string]string) string {
+func GenerateKey(metric string, tags map[string]string) string {
 	if len(tags) == 0 {
 		return metric
 	}

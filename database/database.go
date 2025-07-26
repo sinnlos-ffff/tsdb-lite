@@ -18,12 +18,12 @@ type TimeSeries struct {
 
 type Database struct {
 	sync.RWMutex
-	series map[string]*TimeSeries
+	Series map[string]*TimeSeries
 }
 
 func NewDatabase() *Database {
 	return &Database{
-		series: make(map[string]*TimeSeries),
+		Series: make(map[string]*TimeSeries),
 	}
 }
 
@@ -31,10 +31,10 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) {
 	db.Lock()
 	defer db.Unlock()
 
-	key := generateKey(metric, tags)
+	key := GenerateKey(metric, tags)
 
 	// TODO: error handling
-	if _, ok := db.series[key]; ok {
+	if _, ok := db.Series[key]; ok {
 		return
 	}
 
@@ -44,5 +44,5 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) {
 		Points: make([]Point, 0),
 	}
 
-	db.series[key] = &ts
+	db.Series[key] = &ts
 }
