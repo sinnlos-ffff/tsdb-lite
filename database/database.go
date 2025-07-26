@@ -33,6 +33,7 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) {
 
 	key := generateKey(metric, tags)
 
+	// TODO: error handling
 	if _, ok := db.series[key]; ok {
 		return
 	}

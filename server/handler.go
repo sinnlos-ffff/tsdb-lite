@@ -6,6 +6,23 @@ import (
 	"time"
 )
 
+type PostTimeSeriesRequest struct {
+	Metric string            `json:"metric"`
+	Tags   map[string]string `json:"tags"`
+}
+
+func (s *Server) PostTimeSeriesHandler(w http.ResponseWriter, r *http.Request) {
+	var data PostTimeSeriesRequest
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, "Invalid payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	s.Db.AddTimeSeries(data.Metric, data.Tags)
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // TODO: Proper validation
 type PostPointRequest struct {
 	Metric    string            `json:"metric"`
