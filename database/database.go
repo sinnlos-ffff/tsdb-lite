@@ -1,6 +1,8 @@
 package database
 
-import "sync"
+import (
+	"sync"
+)
 
 type Point struct {
 	Timestamp int64
@@ -29,11 +31,17 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) {
 	db.Lock()
 	defer db.Unlock()
 
+	key := generateKey(metric, tags)
+
+	if _, ok := db.series[key]; ok {
+		return
+	}
+
 	ts := TimeSeries{
 		Metric: metric,
 		Tags:   tags,
 		Points: make([]Point, 0),
 	}
 
-	db.series[metric] = &ts
+	db.series[key] = &ts
 }
