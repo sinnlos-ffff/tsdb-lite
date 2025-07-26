@@ -2,18 +2,12 @@ package main
 
 import (
 	"log"
-	"net/http"
+
+	"github.com/sinnlos-ffff/tsdb-lite/server"
 )
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /point", postPointHandler)
-
-	server := &http.Server{
-		Addr:    ":8000",
-		Handler: mux,
-	}
-
-	server.ListenAndServe()
-	log.Printf("Server started on %s", server.Addr)
+	server := server.NewServer()
+	server.HttpServer.ListenAndServe()
+	log.Printf("Server started on %s", server.HttpServer.Addr)
 }
