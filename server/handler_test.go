@@ -37,4 +37,12 @@ func TestPostTimeSeriesHandler(t *testing.T) {
 	assert.True(t, ok, "TimeSeries not found for key: %s", key)
 	assert.Equal(t, metric, ts.Metric)
 	assert.Equal(t, tags, ts.Tags)
+
+	// Re-posting a time series with the same metric and tags returns an error
+	req2, err := http.NewRequest("POST", "/timeseries", bytes.NewBuffer(reqBody))
+	assert.NoError(t, err)
+
+	responseRecorder2 := httptest.NewRecorder()
+	handler.ServeHTTP(responseRecorder2, req2)
+	assert.Equal(t, http.StatusBadRequest, responseRecorder2.Code)
 }
