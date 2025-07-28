@@ -25,11 +25,11 @@ func TestPostTimeSeriesHandler(t *testing.T) {
 	req, err := http.NewRequest("POST", "/timeseries", bytes.NewBuffer(reqBody))
 	assert.NoError(t, err)
 
-	rr := httptest.NewRecorder()
+	responseRecorder := httptest.NewRecorder()
 	handler := http.HandlerFunc(server.PostTimeSeriesHandler)
-	handler.ServeHTTP(rr, req)
+	handler.ServeHTTP(responseRecorder, req)
 
-	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, http.StatusOK, responseRecorder.Code)
 
 	key := database.GenerateKey(metric, tags)
 	ts, ok := db.Series[key]
