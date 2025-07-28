@@ -18,7 +18,10 @@ func (s *Server) PostTimeSeriesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.Db.AddTimeSeries(data.Metric, data.Tags)
+	if err := s.Db.AddTimeSeries(data.Metric, data.Tags); err != nil {
+		http.Error(w, "Failed to add time series: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
 }

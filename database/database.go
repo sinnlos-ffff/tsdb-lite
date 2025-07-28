@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"sync"
 )
 
@@ -27,7 +28,7 @@ func NewDatabase() *Database {
 	}
 }
 
-func (db *Database) AddTimeSeries(metric string, tags map[string]string) {
+func (db *Database) AddTimeSeries(metric string, tags map[string]string) error {
 	db.Lock()
 	defer db.Unlock()
 
@@ -35,7 +36,7 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) {
 
 	// TODO: error handling
 	if _, ok := db.Series[key]; ok {
-		return
+		return errors.New("time series already exists")
 	}
 
 	ts := TimeSeries{
@@ -45,4 +46,6 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) {
 	}
 
 	db.Series[key] = &ts
+
+	return nil
 }
