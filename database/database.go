@@ -49,3 +49,25 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) error {
 
 	return nil
 }
+
+func (db *Database) AddPoint(metric string, tags map[string]string, timestamp int64, value float64) error {
+	db.RLock()
+	defer db.RUnlock()
+
+	key := GenerateKey(metric, tags)
+
+	ts, ok := db.Series[key]
+	if !ok {
+		return errors.New("time series does not exist")
+	}
+
+	ts.Lock()
+	defer ts.Unlock()
+
+	ts.Points = append(ts.Points, Point{
+		Timestamp: timestamp,
+		Value:     value,
+	})
+
+	return nil
+}
