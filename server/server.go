@@ -21,7 +21,7 @@ func NewServer() *Server {
 			Handler: mux,
 		},
 	}
-	mux.HandleFunc("POST /time-series", s.PostTimeSeriesHandler)
+	mux.HandleFunc("POST /timeseries", s.PostTimeSeriesHandler)
 	mux.HandleFunc("POST /point", s.PostPointHandler)
 
 	return s
