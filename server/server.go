@@ -17,10 +17,11 @@ func NewServer() *Server {
 	s := &Server{
 		Db: db,
 		HttpServer: &http.Server{
-			Addr:    ":8000",
+			Addr:    ":8080",
 			Handler: mux,
 		},
 	}
+	mux.HandleFunc("POST /time-series", s.PostTimeSeriesHandler)
 	mux.HandleFunc("POST /point", s.PostPointHandler)
 
 	return s
