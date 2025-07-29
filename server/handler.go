@@ -48,5 +48,10 @@ func (s *Server) PostPointHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := s.Db.AddPoint(data.Metric, data.Tags, data.Timestamp, data.Value); err != nil {
+		http.Error(w, "Failed to add point: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
