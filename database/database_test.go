@@ -13,7 +13,7 @@ func TestAddTimeSeries(t *testing.T) {
 	db.AddTimeSeries(metric, tags)
 
 	key := GenerateKey(metric, tags)
-	ts, ok := db.Series[key]
+	ts, ok := db.GetShard(key).Series[key]
 
 	assert.True(t, ok, "TimeSeries not found for key: %s", key)
 	assert.Equal(t, metric, ts.Metric)
@@ -31,7 +31,7 @@ func TestAddPoint(t *testing.T) {
 	db.AddPoint(metric, tags, timestamp, value)
 
 	key := GenerateKey(metric, tags)
-	ts, ok := db.Series[key]
+	ts, ok := db.GetShard(key).Series[key]
 
 	assert.True(t, ok, "TimeSeries not found for key: %s", key)
 	assert.Len(t, ts.Points, 1, "Expected 1 point in TimeSeries")

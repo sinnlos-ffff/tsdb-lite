@@ -33,7 +33,7 @@ func TestPostTimeSeriesHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, responseRecorder.Code)
 
 	key := database.GenerateKey(metric, tags)
-	ts, ok := db.Series[key]
+	ts, ok := db.GetShard(key).Series[key]
 
 	assert.True(t, ok, "TimeSeries not found for key: %s", key)
 	assert.Equal(t, metric, ts.Metric)
@@ -79,7 +79,7 @@ func TestPostPointHandler(t *testing.T) {
 
 	// Check if the point was added to the time series
 	key := database.GenerateKey(metric, tags)
-	ts, ok := db.Series[key]
+	ts, ok := db.GetShard(key).Series[key]
 	assert.True(t, ok)
 	assert.Equal(t, 1, len(ts.Points))
 	assert.Equal(t, timestamp, ts.Points[0].Timestamp)
