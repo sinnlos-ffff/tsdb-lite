@@ -13,7 +13,7 @@ type Point struct {
 }
 
 type TimeSeries struct {
-	sync.Mutex
+	sync.RWMutex
 	Metric string
 	Tags   map[string]string
 	Points []Point // TODO: sort by timestamp when possible
