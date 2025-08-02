@@ -81,9 +81,9 @@ func TestPostPointHandler(t *testing.T) {
 	key := database.GenerateKey(metric, tags)
 	ts, ok := db.GetShard(key).Series[key]
 	assert.True(t, ok)
-	assert.Equal(t, 1, len(ts.Points))
-	assert.Equal(t, timestamp, ts.Points[0].Timestamp)
-	assert.Equal(t, value, ts.Points[0].Value)
+	assert.Equal(t, 1, len(ts.Chunks[0].Points))
+	assert.Equal(t, timestamp, ts.Chunks[0].Points[0].Timestamp)
+	assert.Equal(t, value, ts.Chunks[0].Points[0].Value)
 
 	// Posting a point with a future timestamp returns an error
 	futureTimestamp := time.Now().Unix() + 1000

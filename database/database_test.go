@@ -34,7 +34,10 @@ func TestAddPoint(t *testing.T) {
 	ts, ok := db.GetShard(key).Series[key]
 
 	assert.True(t, ok, "TimeSeries not found for key: %s", key)
-	assert.Len(t, ts.Points, 1, "Expected 1 point in TimeSeries")
-	assert.Equal(t, timestamp, ts.Points[0].Timestamp)
-	assert.Equal(t, value, ts.Points[0].Value)
+	assert.Len(t, ts.Chunks, 1, "Expected 1 Chunk")
+
+	chunk := ts.Chunks[0]
+	assert.Len(t, chunk.Points, 1, "Expected 1 Point")
+	assert.Equal(t, timestamp, chunk.Points[0].Timestamp)
+	assert.Equal(t, value, chunk.Points[0].Value)
 }

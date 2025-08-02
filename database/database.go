@@ -65,7 +65,9 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) error {
 	ts := TimeSeries{
 		Metric: metric,
 		Tags:   tags,
-		Chunks: make([]*Chunk, 0),
+		Chunks: []*Chunk{{
+			Points: make([]Point, 0, ChunkSize),
+		}},
 	}
 
 	shard.Lock()
@@ -91,16 +93,14 @@ func (db *Database) AddPoint(metric string, tags map[string]string, timestamp in
 	ts.Lock()
 	defer ts.Unlock()
 
-	chunks := ts.Chunks
-
-	if len(chunks) == 0 || chunks[len(chunks)-1].Count == ChunkSize {
-		chunks = append(chunks, &Chunk{
+	if ts.Chunks[len(ts.Chunks)-1].Count == ChunkSize {
+		ts.Chunks = append(ts.Chunks, &Chunk{
 			Points: make([]Point, 0, ChunkSize),
 			Count:  0,
 		})
 	}
 
-	chunk := chunks[len(chunks)-1]
+	chunk := ts.Chunks[len(ts.Chunks)-1]
 	chunk.Points = append(chunk.Points, Point{
 		Timestamp: timestamp,
 		Value:     value,
