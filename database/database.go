@@ -12,11 +12,18 @@ type Point struct {
 	Value     float64
 }
 
+const ChunkSize = 2048
+
+type Chunk struct {
+	Points []Point
+	Count  int
+}
+
 type TimeSeries struct {
 	sync.RWMutex
 	Metric string
 	Tags   map[string]string
-	Points []Point // TODO: sort by timestamp when possible
+	Chunks []*Chunk
 }
 
 type Shard struct {
@@ -30,6 +37,7 @@ type Database struct {
 
 func NewDatabase() *Database {
 	db := &Database{
+		// TODO: Dynamically update shard length.
 		Shards: make([]*Shard, 32),
 	}
 	for i := range db.Shards {
@@ -57,7 +65,7 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) error {
 	ts := TimeSeries{
 		Metric: metric,
 		Tags:   tags,
-		Points: make([]Point, 0),
+		Chunks: make([]*Chunk, 0),
 	}
 
 	shard.Lock()
@@ -83,10 +91,21 @@ func (db *Database) AddPoint(metric string, tags map[string]string, timestamp in
 	ts.Lock()
 	defer ts.Unlock()
 
-	ts.Points = append(ts.Points, Point{
+	chunks := ts.Chunks
+
+	if len(chunks) == 0 || chunks[len(chunks)-1].Count == ChunkSize {
+		chunks = append(chunks, &Chunk{
+			Points: make([]Point, 0, ChunkSize),
+			Count:  0,
+		})
+	}
+
+	chunk := chunks[len(chunks)-1]
+	chunk.Points = append(chunk.Points, Point{
 		Timestamp: timestamp,
 		Value:     value,
 	})
+	chunk.Count++
 
 	return nil
 }
