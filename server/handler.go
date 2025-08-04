@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/sinnlos-ffff/tsdb-lite/database"
 )
 
 type PostTimeSeriesRequest struct {
@@ -54,4 +56,39 @@ func (s *Server) PostPointHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+type GetRangeRequest struct {
+	Metric string            `json:"metric"`
+	Tags   map[string]string `json:"tags"`
+	Start  int64             `json:"start"`
+	End    int64             `json:"end"`
+}
+
+type GetRangeResponse struct {
+	Points []database.Point `json:"points"`
+}
+
+func (s *Server) GetRangeHandler(w http.ResponseWriter, r *http.Request) {
+	var data GetRangeRequest
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, "Invalid payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	points, err := s.Db.GetRange(data.Metric, data.Tags, data.Start, data.End)
+	if err != nil {
+		http.Error(w, "Failed to get range: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := GetRangeResponse{
+		Points: points,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
