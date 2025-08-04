@@ -2,7 +2,8 @@ package database
 
 import "errors"
 
-func (db *Database) GetRange(key string, start, end int64) ([]Point, error) {
+func (db *Database) GetRange(metric string, tags map[string]string, start, end int64) ([]Point, error) {
+	key := GenerateKey(metric, tags)
 	shard := db.GetShard(key)
 
 	shard.RLock()

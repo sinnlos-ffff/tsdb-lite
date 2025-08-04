@@ -24,28 +24,26 @@ func TestGetRange(t *testing.T) {
 	value3 := 30.5
 	db.AddPoint(metric, tags, timestamp3, value3)
 
-	key := GenerateKey(metric, tags)
-
 	// Test range that includes all points
-	points, err := db.GetRange(key, 0, 4000)
+	points, err := db.GetRange(metric, tags, 0, 4000)
 	assert.NoError(t, err)
 	assert.Len(t, points, 3)
 
 	// Test range that includes only the first two points
-	points, err = db.GetRange(key, 500, 2500)
+	points, err = db.GetRange(metric, tags, 500, 2500)
 	assert.NoError(t, err)
 	assert.Len(t, points, 2)
 	assert.Equal(t, value1, points[0].Value)
 	assert.Equal(t, value2, points[1].Value)
 
 	// Test range that includes no points
-	points, err = db.GetRange(key, 4000, 5000)
+	points, err = db.GetRange(metric, tags, 4000, 5000)
 	assert.NoError(t, err)
 	assert.Len(t, points, 0)
 
-	// Test range with invalid key
-	invalidKey := "invalid_key"
-	points, err = db.GetRange(invalidKey, 0, 4000)
+	// Test range with invalid metric
+	invalidMetric := "invalid_metric"
+	points, err = db.GetRange(invalidMetric, tags, 0, 4000)
 	assert.Error(t, err)
 	assert.Nil(t, points)
 }
