@@ -102,3 +102,69 @@ func TestPostPointHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, responseRecorder.Code)
 }
+
+func TestGetRangeHandler(t *testing.T) {
+	db := database.NewDatabase()
+	server := &Server{Db: db}
+
+	metric := "test_metric"
+	tags := map[string]string{"tag1": "value1"}
+	err := db.AddTimeSeries(metric, tags)
+	assert.NoError(t, err)
+
+	// Add points to the time series
+	timestamp1 := int64(1000)
+	value1 := 10.5
+	db.AddPoint(metric, tags, timestamp1, value1)
+
+	timestamp2 := int64(2000)
+	value2 := 20.5
+	db.AddPoint(metric, tags, timestamp2, value2)
+
+	timestamp3 := int64(3000)
+	value3 := 30.5
+	db.AddPoint(metric, tags, timestamp3, value3)
+
+	reqBody, _ := json.Marshal(GetRangeRequest{
+		Metric: metric,
+		Tags:   tags,
+		Start:  0,
+		End:    4000,
+	})
+
+	req, err := http.NewRequest("GET", "/range", bytes.NewBuffer(reqBody))
+	assert.NoError(t, err)
+
+	responseRecorder := httptest.NewRecorder()
+	handler := http.HandlerFunc(server.GetRangeHandler)
+	handler.ServeHTTP(responseRecorder, req)
+
+	assert.Equal(t, http.StatusOK, responseRecorder.Code)
+
+	var response GetRangeResponse
+	err = json.Unmarshal(responseRecorder.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Len(t, response.Points, 3)
+
+	// Test range that includes only the first two points
+	reqBody, _ = json.Marshal(GetRangeRequest{
+		Metric: metric,
+		Tags:   tags,
+		Start:  500,
+		End:    2500,
+	})
+
+	req, err = http.NewRequest("GET", "/range", bytes.NewBuffer(reqBody))
+	assert.NoError(t, err)
+
+	responseRecorder = httptest.NewRecorder()
+	handler.ServeHTTP(responseRecorder, req)
+
+	assert.Equal(t, http.StatusOK, responseRecorder.Code)
+
+	err = json.Unmarshal(responseRecorder.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Len(t, response.Points, 2)
+	assert.Equal(t, value1, response.Points[0].Value)
+	assert.Equal(t, value2, response.Points[1].Value)
+}
