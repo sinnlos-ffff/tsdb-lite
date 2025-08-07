@@ -15,8 +15,9 @@ type Point struct {
 const ChunkSize = 2048
 
 type Chunk struct {
-	Points []Point
-	Count  int
+	Points    []Point
+	Count     int
+	Compacted bool
 }
 
 type TimeSeries struct {
@@ -93,10 +94,11 @@ func (db *Database) AddPoint(metric string, tags map[string]string, timestamp in
 	ts.Lock()
 	defer ts.Unlock()
 
-	if ts.Chunks[len(ts.Chunks)-1].Count == ChunkSize {
+	if ts.Chunks[len(ts.Chunks)-1].Count == ChunkSize || ts.Chunks[len(ts.Chunks)-1].Compacted {
 		ts.Chunks = append(ts.Chunks, &Chunk{
-			Points: make([]Point, 0, ChunkSize),
-			Count:  0,
+			Points:    make([]Point, 0, ChunkSize),
+			Count:     0,
+			Compacted: false,
 		})
 	}
 
