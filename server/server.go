@@ -23,6 +23,7 @@ func NewServer() *Server {
 	}
 	mux.HandleFunc("POST /timeseries", s.PostTimeSeriesHandler)
 	mux.HandleFunc("POST /point", s.PostPointHandler)
+	mux.HandleFunc("GET /range", s.GetRangeHandler)
 
 	return s
 }
