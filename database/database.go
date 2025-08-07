@@ -2,7 +2,9 @@ package database
 
 import (
 	"errors"
+	"sort"
 	"sync"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -32,6 +34,38 @@ type Shard struct {
 	Series map[string]*TimeSeries
 }
 
+func (s *Shard) CompactChunks() {
+	s.Lock()
+	defer s.Unlock()
+
+	for _, ts := range s.Series {
+		ts.Lock()
+		defer ts.Unlock()
+
+		for _, chunk := range ts.Chunks {
+			if chunk.Compacted || chunk.Count < ChunkSize {
+				continue
+			}
+
+			sort.Slice(chunk.Points[:chunk.Count], func(i, j int) bool {
+				return chunk.Points[i].Timestamp < chunk.Points[j].Timestamp
+			})
+			chunk.Compacted = true
+		}
+	}
+}
+
+func (s *Shard) RunCompactor(interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			s.CompactChunks()
+		}
+	}()
+}
+
 type Database struct {
 	Shards []*Shard
 }
@@ -52,6 +86,12 @@ func NewDatabase() *Database {
 func (db *Database) GetShard(key string) *Shard {
 	shardIndex := xxhash.Sum64String(key) % uint64(len(db.Shards))
 	return db.Shards[shardIndex]
+}
+
+func (db *Database) StartCompactors(interval time.Duration) {
+	for i := range db.Shards {
+		db.Shards[i].RunCompactor(interval)
+	}
 }
 
 func (db *Database) AddTimeSeries(metric string, tags map[string]string) error {
