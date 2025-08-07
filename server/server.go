@@ -12,7 +12,11 @@ type Server struct {
 	HttpServer *http.Server
 }
 
-func NewServer() *Server {
+type Config struct {
+	CompactionInterval time.Duration
+}
+
+func NewServer(config *Config) *Server {
 	db := database.NewDatabase()
 	mux := http.NewServeMux()
 	s := &Server{
@@ -23,8 +27,7 @@ func NewServer() *Server {
 		},
 	}
 
-	// TODO: Find optimal interval
-	s.Db.StartCompactors(time.Minute)
+	s.Db.StartCompactors(config.CompactionInterval)
 
 	mux.HandleFunc("POST /timeseries", s.PostTimeSeriesHandler)
 	mux.HandleFunc("POST /point", s.PostPointHandler)

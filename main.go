@@ -2,12 +2,17 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/sinnlos-ffff/tsdb-lite/server"
 )
 
 func main() {
-	s := server.NewServer()
+	s := server.NewServer(&server.Config{
+		// TODO: Find optimal compaction interval
+		// TODO: Add test
+		CompactionInterval: time.Minute,
+	})
 	port := s.HttpServer.Addr
 
 	log.Printf("Starting server on %s\n", port)

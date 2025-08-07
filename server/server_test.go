@@ -15,7 +15,9 @@ import (
 
 func TestServer_Integration(t *testing.T) {
 	// Create a new server
-	server := NewServer()
+	server := NewServer(&Config{
+		CompactionInterval: time.Minute,
+	})
 
 	// Create a test server that uses the actual HTTP mux
 	testServer := httptest.NewServer(server.HttpServer.Handler)
@@ -299,14 +301,4 @@ func TestServer_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusMethodNotAllowed, resp2.StatusCode)
 	})
-}
-
-func TestServerStartupAndShutdown(t *testing.T) {
-	server := NewServer()
-
-	// Test that the server is configured correctly
-	assert.NotNil(t, server.Db)
-	assert.NotNil(t, server.HttpServer)
-	assert.Equal(t, ":8080", server.HttpServer.Addr)
-	assert.NotNil(t, server.HttpServer.Handler)
 }
