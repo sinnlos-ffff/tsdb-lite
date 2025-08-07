@@ -302,3 +302,67 @@ func TestServer_Integration(t *testing.T) {
 		assert.Equal(t, http.StatusMethodNotAllowed, resp2.StatusCode)
 	})
 }
+
+func TestServer_Compaction(t *testing.T) {
+	server := NewServer(&Config{
+		CompactionInterval: time.Second,
+	})
+
+	testServer := httptest.NewServer(server.HttpServer.Handler)
+	defer testServer.Close()
+
+	metric := "cpu_usage"
+	tags := map[string]string{"host": "server1", "region": "us-west"}
+
+	reqBody := PostTimeSeriesRequest{
+		Metric: metric,
+		Tags:   tags,
+	}
+
+	body, err := json.Marshal(reqBody)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		testServer.URL+"/timeseries",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	for i := 0; i < database.ChunkSize; i++ {
+		timestamp := time.Now().Unix() - int64(i)
+
+		pointReqBody := PostPointRequest{
+			Metric:    metric,
+			Timestamp: timestamp,
+			Value:     float64(i),
+			Tags:      tags,
+		}
+
+		pointBody, err := json.Marshal(pointReqBody)
+		require.NoError(t, err)
+
+		resp, err := http.Post(
+			testServer.URL+"/point",
+			"application/json",
+			bytes.NewBuffer(pointBody),
+		)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	time.Sleep(time.Second)
+
+	key := database.GenerateKey(metric, tags)
+	shard := server.Db.GetShard(key)
+	chunk := shard.Series[key].Chunks[0]
+
+	for i := 1; i < database.ChunkSize; i++ {
+		assert.True(t, chunk.Points[i].Timestamp >= chunk.Points[i-1].Timestamp)
+	}
+}

@@ -47,7 +47,7 @@ func (s *Shard) CompactChunks() {
 				continue
 			}
 
-			sort.Slice(chunk.Points[:chunk.Count], func(i, j int) bool {
+			sort.Slice(chunk.Points[:ChunkSize], func(i, j int) bool {
 				return chunk.Points[i].Timestamp < chunk.Points[j].Timestamp
 			})
 			chunk.Compacted = true
