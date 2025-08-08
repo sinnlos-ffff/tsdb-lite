@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/sinnlos-ffff/tsdb-lite/metrics"
 	"github.com/sinnlos-ffff/tsdb-lite/server"
 )
 
@@ -14,6 +15,8 @@ func main() {
 		CompactionInterval: time.Minute,
 	})
 	port := s.HttpServer.Addr
+
+	metrics.InitMetrics()
 
 	log.Printf("Starting server on %s\n", port)
 	if err := s.HttpServer.ListenAndServe(); err != nil {

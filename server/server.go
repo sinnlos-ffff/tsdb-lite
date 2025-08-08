@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sinnlos-ffff/tsdb-lite/database"
 )
 
@@ -32,6 +33,8 @@ func NewServer(config *Config) *Server {
 	mux.HandleFunc("POST /timeseries", s.PostTimeSeriesHandler)
 	mux.HandleFunc("POST /point", s.PostPointHandler)
 	mux.HandleFunc("GET /range", s.GetRangeHandler)
+
+	mux.Handle("GET /metrics", promhttp.Handler())
 
 	return s
 }

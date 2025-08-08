@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/sinnlos-ffff/tsdb-lite/metrics"
 )
 
 type Point struct {
@@ -50,7 +51,9 @@ func (s *Shard) CompactChunks() {
 			sort.Slice(chunk.Points[:ChunkSize], func(i, j int) bool {
 				return chunk.Points[i].Timestamp < chunk.Points[j].Timestamp
 			})
+
 			chunk.Compacted = true
+			metrics.CompactedChunksTotal.Inc()
 		}
 	}
 }
@@ -120,6 +123,7 @@ func (db *Database) AddTimeSeries(metric string, tags map[string]string) error {
 }
 
 func (db *Database) AddPoint(metric string, tags map[string]string, timestamp int64, value float64) error {
+	start := time.Now()
 	key := GenerateKey(metric, tags)
 	shard := db.GetShard(key)
 
@@ -148,6 +152,9 @@ func (db *Database) AddPoint(metric string, tags map[string]string, timestamp in
 		Value:     value,
 	})
 	chunk.Count++
+
+	metrics.IngestLatency.Observe(time.Since(start).Seconds())
+	metrics.IngestTotal.Inc()
 
 	return nil
 }
