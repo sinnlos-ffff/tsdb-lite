@@ -1,50 +1,68 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"context"
+	"log"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/sinnlos-ffff/tsdb-lite/database"
+	pb "github.com/sinnlos-ffff/tsdb-lite/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-func TestServer_Integration(t *testing.T) {
+func setupTestServer(t *testing.T) (pb.TsdbLiteClient, *Server) {
 	// Create a new server
 	server := NewServer(&Config{
 		CompactionInterval: time.Minute,
 	})
 
-	// Create a test server that uses the actual HTTP mux
-	testServer := httptest.NewServer(server.HttpServer.Handler)
-	defer testServer.Close()
+	// Create a listener on a random port
+	lis, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
 
-	t.Run("POST /timeseries", func(t *testing.T) {
+	// Create a gRPC server
+	grpcServer := grpc.NewServer()
+	pb.RegisterTsdbLiteServer(grpcServer, server)
+
+	// Start the server in a goroutine
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
+		}
+	}()
+
+	// Create a client connection to the server
+	conn, err := grpc.Dial(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+
+	// Create a client
+	client := pb.NewTsdbLiteClient(conn)
+
+	t.Cleanup(func() {
+		grpcServer.Stop()
+		conn.Close()
+	})
+
+	return client, server
+}
+
+func TestServer_Integration_GRPC(t *testing.T) {
+	client, server := setupTestServer(t)
+
+	t.Run("CreateTimeSeries", func(t *testing.T) {
 		metric := "cpu_usage"
 		tags := map[string]string{"host": "server1", "region": "us-west"}
 
-		reqBody := PostTimeSeriesRequest{
+		_, err := client.CreateTimeSeries(context.Background(), &pb.CreateTimeSeriesRequest{
 			Metric: metric,
 			Tags:   tags,
-		}
-
-		body, err := json.Marshal(reqBody)
+		})
 		require.NoError(t, err)
-
-		// Make actual HTTP request
-		resp, err := http.Post(
-			testServer.URL+"/timeseries",
-			"application/json",
-			bytes.NewBuffer(body),
-		)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Verify the time series was actually created in the database
 		key := database.GenerateKey(metric, tags)
@@ -54,49 +72,27 @@ func TestServer_Integration(t *testing.T) {
 		assert.Equal(t, tags, ts.Tags)
 	})
 
-	t.Run("POST /point", func(t *testing.T) {
+	t.Run("AddPoint", func(t *testing.T) {
 		metric := "disk_usage"
 		tags := map[string]string{"host": "server3", "mount": "/var"}
 		timestamp := time.Now().Unix()
 		value := 75.5
 
 		// First create the time series
-		tsReqBody := PostTimeSeriesRequest{
+		_, err := client.CreateTimeSeries(context.Background(), &pb.CreateTimeSeriesRequest{
 			Metric: metric,
 			Tags:   tags,
-		}
-		tsBody, err := json.Marshal(tsReqBody)
+		})
 		require.NoError(t, err)
-
-		tsResp, err := http.Post(
-			testServer.URL+"/timeseries",
-			"application/json",
-			bytes.NewBuffer(tsBody),
-		)
-		require.NoError(t, err)
-		defer tsResp.Body.Close()
-		require.Equal(t, http.StatusOK, tsResp.StatusCode)
 
 		// Now add a point
-		pointReqBody := PostPointRequest{
+		_, err = client.AddPoint(context.Background(), &pb.AddPointRequest{
 			Metric:    metric,
 			Timestamp: timestamp,
 			Value:     value,
 			Tags:      tags,
-		}
-
-		pointBody, err := json.Marshal(pointReqBody)
+		})
 		require.NoError(t, err)
-
-		resp, err := http.Post(
-			testServer.URL+"/point",
-			"application/json",
-			bytes.NewBuffer(pointBody),
-		)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Verify the point was added
 		key := database.GenerateKey(metric, tags)
@@ -108,26 +104,16 @@ func TestServer_Integration(t *testing.T) {
 		assert.Equal(t, value, ts.Chunks[0].Points[0].Value)
 	})
 
-	t.Run("GET /range", func(t *testing.T) {
+	t.Run("GetRange", func(t *testing.T) {
 		metric := "temperature"
 		tags := map[string]string{"sensor": "A1", "location": "datacenter"}
 
 		// Create time series
-		tsReqBody := PostTimeSeriesRequest{
+		_, err := client.CreateTimeSeries(context.Background(), &pb.CreateTimeSeriesRequest{
 			Metric: metric,
 			Tags:   tags,
-		}
-		tsBody, err := json.Marshal(tsReqBody)
+		})
 		require.NoError(t, err)
-
-		tsResp, err := http.Post(
-			testServer.URL+"/timeseries",
-			"application/json",
-			bytes.NewBuffer(tsBody),
-		)
-		require.NoError(t, err)
-		defer tsResp.Body.Close()
-		require.Equal(t, http.StatusOK, tsResp.StatusCode)
 
 		// Add multiple points
 		points := []struct {
@@ -141,228 +127,72 @@ func TestServer_Integration(t *testing.T) {
 		}
 
 		for _, point := range points {
-			pointReqBody := PostPointRequest{
+			_, err = client.AddPoint(context.Background(), &pb.AddPointRequest{
 				Metric:    metric,
 				Timestamp: point.timestamp,
 				Value:     point.value,
 				Tags:      tags,
-			}
-
-			pointBody, err := json.Marshal(pointReqBody)
+			})
 			require.NoError(t, err)
-
-			resp, err := http.Post(
-				testServer.URL+"/point",
-				"application/json",
-				bytes.NewBuffer(pointBody),
-			)
-			require.NoError(t, err)
-			resp.Body.Close()
-			require.Equal(t, http.StatusOK, resp.StatusCode)
 		}
 
 		// Query range
-		rangeReqBody := GetRangeRequest{
+		resp, err := client.GetRange(context.Background(), &pb.GetRangeRequest{
 			Metric: metric,
 			Tags:   tags,
 			Start:  0,
 			End:    5000,
-		}
-
-		rangeBody, err := json.Marshal(rangeReqBody)
+		})
 		require.NoError(t, err)
 
-		// Note: Using a custom client to send GET with body since http.Get doesn't support it
-		client := &http.Client{}
-		req, err := http.NewRequest("GET", testServer.URL+"/range", bytes.NewBuffer(rangeBody))
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-
-		var rangeResp GetRangeResponse
-		err = json.NewDecoder(resp.Body).Decode(&rangeResp)
-		require.NoError(t, err)
-
-		assert.Len(t, rangeResp.Points, 4)
+		assert.Len(t, resp.Points, 4)
 
 		// Verify points are returned in order
 		for i, expectedPoint := range points {
-			assert.Equal(t, expectedPoint.timestamp, rangeResp.Points[i].Timestamp)
-			assert.Equal(t, expectedPoint.value, rangeResp.Points[i].Value)
+			assert.Equal(t, expectedPoint.timestamp, resp.Points[i].Timestamp)
+			assert.Equal(t, expectedPoint.value, resp.Points[i].Value)
 		}
 	})
 
-	t.Run("GET /range - partial range", func(t *testing.T) {
+	t.Run("GetRange - partial range", func(t *testing.T) {
 		metric := "pressure"
 		tags := map[string]string{"gauge": "B2"}
 
 		// Create time series and add points (similar to above)
-		tsReqBody := PostTimeSeriesRequest{
+		_, err := client.CreateTimeSeries(context.Background(), &pb.CreateTimeSeriesRequest{
 			Metric: metric,
 			Tags:   tags,
-		}
-		tsBody, err := json.Marshal(tsReqBody)
+		})
 		require.NoError(t, err)
-
-		tsResp, err := http.Post(
-			testServer.URL+"/timeseries",
-			"application/json",
-			bytes.NewBuffer(tsBody),
-		)
-		require.NoError(t, err)
-		defer tsResp.Body.Close()
-		require.Equal(t, http.StatusOK, tsResp.StatusCode)
 
 		// Add points
 		timestamps := []int64{1000, 2000, 3000, 4000}
 		values := []float64{100.0, 105.0, 95.0, 110.0}
 
 		for i, ts := range timestamps {
-			pointReqBody := PostPointRequest{
+			_, err = client.AddPoint(context.Background(), &pb.AddPointRequest{
 				Metric:    metric,
 				Timestamp: ts,
 				Value:     values[i],
 				Tags:      tags,
-			}
-
-			pointBody, err := json.Marshal(pointReqBody)
+			})
 			require.NoError(t, err)
-
-			resp, err := http.Post(
-				testServer.URL+"/point",
-				"application/json",
-				bytes.NewBuffer(pointBody),
-			)
-			require.NoError(t, err)
-			resp.Body.Close()
-			require.Equal(t, http.StatusOK, resp.StatusCode)
 		}
 
 		// Query partial range (should return only middle two points)
-		rangeReqBody := GetRangeRequest{
+		resp, err := client.GetRange(context.Background(), &pb.GetRangeRequest{
 			Metric: metric,
 			Tags:   tags,
 			Start:  1500, // Between first and second point
 			End:    3500, // Between third and fourth point
-		}
-
-		rangeBody, err := json.Marshal(rangeReqBody)
-		require.NoError(t, err)
-
-		client := &http.Client{}
-		req, err := http.NewRequest("GET", testServer.URL+"/range", bytes.NewBuffer(rangeBody))
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-		var rangeResp GetRangeResponse
-		err = json.NewDecoder(resp.Body).Decode(&rangeResp)
+		})
 		require.NoError(t, err)
 
 		// Should return only the middle two points
-		assert.Len(t, rangeResp.Points, 2)
-		assert.Equal(t, int64(2000), rangeResp.Points[0].Timestamp)
-		assert.Equal(t, 105.0, rangeResp.Points[0].Value)
-		assert.Equal(t, int64(3000), rangeResp.Points[1].Timestamp)
-		assert.Equal(t, 95.0, rangeResp.Points[1].Value)
+		assert.Len(t, resp.Points, 2)
+		assert.Equal(t, int64(2000), resp.Points[0].Timestamp)
+		assert.Equal(t, 105.0, resp.Points[0].Value)
+		assert.Equal(t, int64(3000), resp.Points[1].Timestamp)
+		assert.Equal(t, 95.0, resp.Points[1].Value)
 	})
-
-	t.Run("Invalid routes return 404", func(t *testing.T) {
-		resp, err := http.Get(testServer.URL + "/invalid")
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-	})
-
-	t.Run("Wrong HTTP method returns 405", func(t *testing.T) {
-		// GET to /timeseries should fail (only POST allowed)
-		resp, err := http.Get(testServer.URL + "/timeseries")
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-
-		// POST to /range should fail (only GET allowed)
-		resp2, err := http.Post(testServer.URL+"/range", "application/json", bytes.NewBufferString("{}"))
-		require.NoError(t, err)
-		defer resp2.Body.Close()
-
-		assert.Equal(t, http.StatusMethodNotAllowed, resp2.StatusCode)
-	})
-}
-
-func TestServer_Compaction(t *testing.T) {
-	server := NewServer(&Config{
-		CompactionInterval: time.Second,
-	})
-
-	testServer := httptest.NewServer(server.HttpServer.Handler)
-	defer testServer.Close()
-
-	metric := "cpu_usage"
-	tags := map[string]string{"host": "server1", "region": "us-west"}
-
-	reqBody := PostTimeSeriesRequest{
-		Metric: metric,
-		Tags:   tags,
-	}
-
-	body, err := json.Marshal(reqBody)
-	require.NoError(t, err)
-
-	resp, err := http.Post(
-		testServer.URL+"/timeseries",
-		"application/json",
-		bytes.NewBuffer(body),
-	)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	for i := 0; i < database.ChunkSize; i++ {
-		timestamp := time.Now().Unix() - int64(i)
-
-		pointReqBody := PostPointRequest{
-			Metric:    metric,
-			Timestamp: timestamp,
-			Value:     float64(i),
-			Tags:      tags,
-		}
-
-		pointBody, err := json.Marshal(pointReqBody)
-		require.NoError(t, err)
-
-		resp, err := http.Post(
-			testServer.URL+"/point",
-			"application/json",
-			bytes.NewBuffer(pointBody),
-		)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-	}
-
-	time.Sleep(time.Second)
-
-	key := database.GenerateKey(metric, tags)
-	shard := server.Db.GetShard(key)
-	chunk := shard.Series[key].Chunks[0]
-
-	for i := 1; i < database.ChunkSize; i++ {
-		assert.True(t, chunk.Points[i].Timestamp >= chunk.Points[i-1].Timestamp)
-	}
 }

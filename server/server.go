@@ -1,16 +1,18 @@
 package server
 
 import (
-	"net/http"
+	"net"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sinnlos-ffff/tsdb-lite/database"
+	pb "github.com/sinnlos-ffff/tsdb-lite/proto"
+	"google.golang.org/grpc"
 )
 
 type Server struct {
 	Db         *database.Database
-	HttpServer *http.Server
+	grpcServer *grpc.Server
+	pb.UnimplementedTsdbLiteServer
 }
 
 type Config struct {
@@ -19,22 +21,23 @@ type Config struct {
 
 func NewServer(config *Config) *Server {
 	db := database.NewDatabase()
-	mux := http.NewServeMux()
 	s := &Server{
-		Db: db,
-		HttpServer: &http.Server{
-			Addr:    ":8080",
-			Handler: mux,
-		},
+		Db:         db,
+		grpcServer: grpc.NewServer(),
 	}
-
-	s.Db.StartCompactors(config.CompactionInterval)
-
-	mux.HandleFunc("POST /timeseries", s.PostTimeSeriesHandler)
-	mux.HandleFunc("POST /point", s.PostPointHandler)
-	mux.HandleFunc("GET /range", s.GetRangeHandler)
-
-	mux.Handle("GET /metrics", promhttp.Handler())
-
+	db.StartCompactors(config.CompactionInterval)
+	pb.RegisterTsdbLiteServer(s.grpcServer, s)
 	return s
+}
+
+func (s *Server) ListenAndServe(addr string) error {
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	return s.grpcServer.Serve(lis)
+}
+
+func (s *Server) Shutdown() {
+	s.grpcServer.GracefulStop()
 }
