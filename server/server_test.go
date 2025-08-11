@@ -25,13 +25,9 @@ func setupTestServer(t *testing.T) (pb.TsdbLiteClient, *Server) {
 	lis, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
 
-	// Create a gRPC server
-	grpcServer := grpc.NewServer()
-	pb.RegisterTsdbLiteServer(grpcServer, server)
-
 	// Start the server in a goroutine
 	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
+		if err := server.grpcServer.Serve(lis); err != nil {
 			log.Fatalf("Failed to serve: %v", err)
 		}
 	}()
@@ -44,7 +40,7 @@ func setupTestServer(t *testing.T) (pb.TsdbLiteClient, *Server) {
 	client := pb.NewTsdbLiteClient(conn)
 
 	t.Cleanup(func() {
-		grpcServer.Stop()
+		server.grpcServer.Stop()
 		conn.Close()
 	})
 

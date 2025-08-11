@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 
-	"github.com/sinnlos-ffff/tsdb-lite/database"
 	pb "github.com/sinnlos-ffff/tsdb-lite/proto"
 )
 
@@ -29,7 +28,6 @@ func (s *Server) GetRange(ctx context.Context, req *pb.GetRangeRequest) (*pb.Get
 
 	pbPoints := make([]*pb.Point, len(points))
 	for i, p := range points {
-		var _ database.Point = p
 		pbPoints[i] = &pb.Point{Timestamp: p.Timestamp, Value: p.Value}
 	}
 
