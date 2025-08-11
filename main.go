@@ -10,16 +10,14 @@ import (
 
 func main() {
 	s := server.NewServer(&server.Config{
-		// TODO: Find optimal compaction interval
-		// TODO: Add test
 		CompactionInterval: time.Minute,
 	})
-	port := s.HttpServer.Addr
 
 	metrics.InitMetrics()
 
-	log.Printf("Starting server on %s\n", port)
-	if err := s.HttpServer.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to start server on %s\n", port)
+	port := ":8080"
+	log.Printf("Starting gRPC server on %s\n", port)
+	if err := s.ListenAndServe(port); err != nil {
+		log.Fatalf("Failed to start server on %s: %v\n", port, err)
 	}
 }

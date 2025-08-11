@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/sinnlos-ffff/tsdb-lite/proto";
+
+service TsdbLite {
+  rpc CreateTimeSeries(CreateTimeSeriesRequest) returns (CreateTimeSeriesResponse) {}
+  rpc AddPoint(AddPointRequest) returns (AddPointResponse) {}
+  rpc GetRange(GetRangeRequest) returns (GetRangeResponse) {}
+}
+
+message CreateTimeSeriesRequest {
+  string metric = 1;
+  map<string, string> tags = 2;
+}
+
+message CreateTimeSeriesResponse {}
+
+message AddPointRequest {
+  string metric = 1;
+  map<string, string> tags = 2;
+  int64 timestamp = 3;
+  double value = 4;
+}
+
+message AddPointResponse {}
+
+message Point {
+  int64 timestamp = 1;
+  double value = 2;
+}
+
+message GetRangeRequest {
+  string metric = 1;
+  map<string, string> tags = 2;
+  int64 start = 3;
+  int64 end = 4;
+}
+
+message GetRangeResponse {
+  repeated Point points = 1;
+}
